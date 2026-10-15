@@ -1,0 +1,1007 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Emulador Sennheiser G3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: transmissor à esquerda, receptor à direita, o infravermelho entre os dois. */
+:root{
+  --bg:#f2efe9; --fg:#1d1b17; --muted:#6b655b; --panel:#fffdf8; --line:#ddd6c8;
+  --accent:#b4531a; --ok:#2f7d4f; --warn:#b03021;
+  --case:#2a2a2c; --case2:#1c1c1e; --caseline:#3d3d40; --caseink:#d8d4cc;
+  --lcd-on:#e2893c; --lcd-off:#a8ab9c; --lcd-ink:#241a10; --led-off:#4a4a4d;
+  --fs:'IBM Plex Sans',system-ui,sans-serif;
+  --fm:'IBM Plex Mono',ui-monospace,monospace;
+  --fd:'DotGothic16','IBM Plex Mono',monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17161a; --fg:#eae6de; --muted:#9a9388; --panel:#201f24; --line:#33313a;
+  --accent:#e0813f; --ok:#5cc188; --warn:#e2695c; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#17161a; --fg:#eae6de; --muted:#9a9388; --panel:#201f24; --line:#33313a;
+  --accent:#e0813f; --ok:#5cc188; --warn:#e2695c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--fs);line-height:1.5}
+.wrap{max-width:1060px;margin:0 auto;padding-block:26px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:clamp(1.5rem,4vw,2rem);margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:64ch;font-size:.92rem}
+
+/* seletor de banda */
+.bandbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.bandbar span{font-family:var(--fm);font-size:.72rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
+.bd{font-family:var(--fm);font-size:.78rem;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:transparent;color:var(--fg)}
+.bd[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.bd:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* aparelhos */
+.bench{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;margin-top:18px;align-items:center}
+@media (max-width:820px){.bench{grid-template-columns:1fr}}
+.irlane{display:flex;flex-direction:column;align-items:center;gap:6px}
+.irlane span{font-size:.62rem;font-family:var(--fm);color:var(--muted);text-align:center;
+  line-height:1.25;max-width:76px}
+.ir{width:42px;height:42px;border-radius:50%;border:1px dashed var(--line);background:transparent;
+  color:var(--accent);cursor:pointer;font-family:var(--fm);font-size:.62rem;letter-spacing:.06em;
+  display:grid;place-items:center;padding:0}
+.ir:hover{border-style:solid;border-color:var(--accent);background:var(--accent);color:#fff}
+.ir:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.dev{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.dev h2{font-size:1.05rem;letter-spacing:-.005em;color:var(--accent);margin:0 0 1px;font-weight:600}
+.dev .role{font-size:.84rem;margin:0 0 14px;font-weight:400;color:var(--muted)}
+.case{background:linear-gradient(170deg,var(--case),var(--case2));border-radius:12px;
+  padding:13px;border:1px solid var(--caseline);display:grid;gap:11px;container-type:inline-size;
+  max-width:430px;margin:0 auto}
+.caseTop{display:flex;gap:11px;align-items:stretch}
+.lcd{flex:1;min-width:0;border-radius:4px;padding:6px 8px;aspect-ratio:2.45/1;
+  background:var(--lcd-on);color:var(--lcd-ink);font-family:var(--fd);position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 2px #0006,0 0 16px -4px #e2893c66;
+  transition:background .5s ease,box-shadow .5s ease;display:flex;gap:7px}
+.lcd::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.42;
+  background:repeating-linear-gradient(to right,#0000 0 2px,#00000030 2px 3px),
+             repeating-linear-gradient(to bottom,#0000 0 2px,#00000030 2px 3px)}
+.lcd.off::after{opacity:.2}
+.lcd.dim{background:var(--lcd-off);box-shadow:inset 0 0 0 2px #0006}
+.lcd.off{background:#2e3230;box-shadow:inset 0 0 0 2px #0006}
+.lcd.off>*{display:none}
+.lcdText{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;
+  font-size:clamp(10px,5.3cqi,17px);line-height:1.34;letter-spacing:.02em}
+.ln{display:flex;gap:.4em;align-items:baseline;white-space:nowrap;overflow:hidden}
+.ln.r{justify-content:flex-end}.ln.c{justify-content:center}
+.grow{flex:1}
+.inv{background:var(--lcd-ink);color:var(--lcd-on);padding:0 .15em}
+.lcd.dim .inv{color:var(--lcd-off)}
+.big{font-size:1.5rem;letter-spacing:.04em}
+.meters{display:flex;gap:4px;align-items:stretch;padding-right:3px}
+.mtr{display:flex;flex-direction:column;align-items:center;gap:2px;width:13px;justify-content:flex-end}
+.bar{width:10px;flex:1;min-height:30px;position:relative;display:flex;flex-direction:column-reverse;gap:1.5px}
+.seg{flex:1;min-height:2px;background:var(--lcd-ink);opacity:.12}
+.seg.on{opacity:1}
+.seg.hold{opacity:.55}
+.sq{position:absolute;left:-3px;width:17px;height:2px;background:var(--lcd-ink)}
+.mtr span{font-size:.58rem;opacity:.75}
+.ant{font-size:.6rem;height:.9em;opacity:.8}
+.lk{display:inline-block;width:9px;height:7px;background:currentColor;position:relative;
+  border-radius:1px;vertical-align:middle;margin-left:3px}
+.lk::before{content:"";position:absolute;left:1.5px;top:-4px;width:4px;height:4px;
+  border:1.5px solid currentColor;border-bottom:0;border-radius:3px 3px 0 0}
+.bt{display:inline-flex;align-items:center;gap:1.5px;border:1.5px solid currentColor;
+  padding:1.5px;border-radius:1px;vertical-align:middle;height:12px}
+.bt i{width:3px;height:5px;background:currentColor;display:block}
+.sg{display:inline-block;width:4px;height:4px;background:currentColor;opacity:.25;
+  margin:0 1.5px;vertical-align:middle}
+.sg.hi{opacity:1;height:11px}
+.leds{display:flex;flex-direction:column;gap:9px;padding-top:4px;width:62px}
+.led{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--led-off);flex:none}
+.dot.red{background:#e6372c;box-shadow:0 0 7px #e6372caa}
+.dot.grn{background:#39c46b;box-shadow:0 0 7px #39c46baa}
+.dot.ylw{background:#e8c13a;box-shadow:0 0 7px #e8c13aaa}
+.led b{font-size:.52rem;font-family:var(--fm);letter-spacing:.04em;color:var(--caseink);font-weight:500}
+.btns{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.btn{background:#39393c;border:1px solid #4b4b4f;color:var(--caseink);border-radius:6px;
+  padding:7px 11px;font-family:var(--fm);font-size:.72rem;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none}
+.btn:hover{background:#45454a}
+.btn:active,.btn.held{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rocker{display:flex;gap:4px}
+.swrow{display:flex;align-items:center;gap:9px;font-family:var(--fm);font-size:.66rem;
+  color:var(--caseink);letter-spacing:.05em}
+.sw{width:42px;height:21px;border-radius:11px;background:#434347;border:1px solid #55555a;
+  position:relative;cursor:pointer;flex:none;padding:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:var(--caseink);transition:transform .16s ease}
+.sw[aria-pressed="true"]{background:var(--warn);border-color:var(--warn)}
+.sw[aria-pressed="true"]::after{transform:translateX(21px)}
+.hint{font-size:.72rem;color:var(--muted);margin:10px 0 0;font-family:var(--fm)}
+
+.statusrow{margin-top:12px;display:flex;justify-content:center}
+.state{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+.chip{font-family:var(--fm);font-size:.7rem;padding:3px 9px;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted)}
+.chip.on{border-color:var(--ok);color:var(--ok)}
+.chip.bad{border-color:var(--warn);color:var(--warn)}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;margin-top:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.card h3{margin:0 0 3px;font-size:.95rem}
+.card p{margin:0 0 12px;color:var(--muted);font-size:.85rem}
+.fld{margin-bottom:14px}
+.fld label{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;margin-bottom:5px}
+.fld label b{font-family:var(--fm);font-weight:500;color:var(--accent);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.btn2{background:transparent;border:1px solid var(--line);color:var(--fg);border-radius:7px;
+  padding:9px 13px;font-family:var(--fs);font-size:.85rem;cursor:pointer}
+.btn2:hover{border-color:var(--accent);color:var(--accent)}
+.btn2:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn2.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn2.primary:hover{opacity:.92;color:#fff}
+.full{width:100%}
+table.ref{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:.76rem}
+table.ref td{padding:3px 0;vertical-align:top;border-bottom:1px solid var(--line);color:var(--muted)}
+table.ref td:first-child{color:var(--fg);padding-right:12px;white-space:nowrap}
+#spec{width:100%;height:118px;display:block;border:1px solid var(--line);border-radius:6px;
+  background:transparent;margin-bottom:10px}
+.exgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:14px 22px}
+.gl div{min-width:0}
+.gl b{display:block;font-size:.86rem}
+.gl b i{font-style:normal;font-family:var(--fm);font-size:.7rem;color:var(--accent);margin-left:7px}
+.gl p{margin:1px 0 0;font-size:.82rem;color:var(--muted)}
+.ex h4{margin:0 0 3px;font-size:.88rem;display:flex;align-items:center;gap:7px}
+.ex p{margin:0 0 9px;font-size:.82rem;color:var(--muted)}
+.mark{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--line);flex:none;
+  display:grid;place-items:center;font-size:.62rem;color:var(--muted)}
+.mark.done{border-color:var(--ok);background:var(--ok);color:#fff}
+.fb{font-size:.8rem;margin-top:8px;font-family:var(--fm);color:var(--muted)}
+.fb.ok{color:var(--ok)}.fb.no{color:var(--warn)}
+.note{font-size:.78rem;color:var(--muted);margin-top:26px;border-top:1px solid var(--line);
+  padding-top:14px;max-width:72ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <h1>Emulador Sennheiser G3</h1>
+  <p class="sub">Os menus de um sistema sem fio de som direto — bodypack e receptor de câmera — para navegar, errar e repetir quantas vezes quiser antes de pegar o equipamento de verdade.</p>
+
+  <div class="bandbar">
+    <span>Banda</span>
+    <button class="bd" data-band="A">A · 516–558</button>
+    <button class="bd" data-band="B" aria-pressed="true">B · 626–668</button>
+  </div>
+
+  <div class="bench">
+    <div class="dev">
+      <h2>Transmissor</h2>
+      <p class="role">Lapela no personagem</p>
+      <div class="case">
+        <div class="caseTop">
+          <div class="lcd" id="tx-lcd"></div>
+          <div class="leds">
+            <div class="led"><span class="dot" id="tx-led1"></span><b>ON</b></div>
+            <div class="led"><span class="dot" id="tx-led2"></span><b>AF&nbsp;PEAK</b></div>
+          </div>
+        </div>
+        <div class="btns">
+          <button class="btn" data-d="tx" data-b="onoff">ON/OFF</button>
+          <div class="rocker">
+            <button class="btn" data-d="tx" data-b="down" aria-label="para baixo">▼</button>
+            <button class="btn" data-d="tx" data-b="up" aria-label="para cima">▲</button>
+          </div>
+          <button class="btn" data-d="tx" data-b="set">SET</button>
+        </div>
+        <div class="swrow">
+          <button class="sw" id="tx-mute" aria-pressed="false" aria-label="chave MUTE"></button>
+          <span>CHAVE MUTE</span>
+        </div>
+      </div>
+      <p class="hint">Segure ▲ ou ▼ para correr os valores depressa.</p>
+    </div>
+
+    <div class="irlane">
+      <button class="ir" id="irbtn" title="Encostar as janelas de infravermelho">IR</button>
+      <span>encostar as janelas</span>
+    </div>
+
+    <div class="dev">
+      <h2>Receptor</h2>
+      <p class="role">Entrada do gravador ou da câmera</p>
+      <div class="case">
+        <div class="caseTop">
+          <div class="lcd" id="rx-lcd"></div>
+          <div class="leds">
+            <div class="led"><span class="dot" id="rx-led1"></span><b>ON</b></div>
+            <div class="led"><span class="dot" id="rx-led2"></span><b>RF</b></div>
+          </div>
+        </div>
+        <div class="btns">
+          <button class="btn" data-d="rx" data-b="onoff">ON/OFF</button>
+          <div class="rocker">
+            <button class="btn" data-d="rx" data-b="down" aria-label="para baixo">▼</button>
+            <button class="btn" data-d="rx" data-b="up" aria-label="para cima">▲</button>
+          </div>
+          <button class="btn" data-d="rx" data-b="set">SET</button>
+        </div>
+      </div>
+      <p class="hint">ON/OFF curto troca a tela, longo desliga. No menu ele é o ESC.</p>
+    </div>
+  </div>
+
+  <div class="statusrow"><div class="state" id="state"></div></div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>A cena</h3>
+      <p>O que acontece na frente do microfone e onde está o personagem.</p>
+      <div class="fld">
+        <label for="voice">Voz do personagem <b id="voice-v">fala normal</b></label>
+        <input type="range" id="voice" min="0" max="100" value="55">
+      </div>
+      <div class="fld">
+        <label for="dist">Distância até a câmera <b id="dist-v">10 m</b></label>
+        <input type="range" id="dist" min="1" max="40" value="10">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Como mexer</h3>
+      <p>Os caminhos que você vai repetir na aula.</p>
+      <table class="ref">
+        <tr><td>Entrar no menu</td><td>SET na tela normal</td></tr>
+        <tr><td>Andar na lista</td><td>▲ ▼ (segure para correr)</td></tr>
+        <tr><td>Entrar / confirmar</td><td>SET</td></tr>
+        <tr><td>Voltar / cancelar</td><td>ON/OFF</td></tr>
+        <tr><td>Trocar a tela normal</td><td>ON/OFF curto</td></tr>
+        <tr><td>Desligar</td><td>ON/OFF longo</td></tr>
+        <tr><td>Procurar canal livre</td><td>Easy Setup › Scan New List</td></tr>
+        <tr><td>Passar para o bodypack</td><td>Sync, e encostar os aparelhos</td></tr>
+        <tr><td>Ajustar o nível</td><td>Bodypack › Sensitivity</td></tr>
+        <tr><td>Destravar</td><td>SET, ▲, SET</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>O que cada palavra quer dizer</h3>
+    <p>O menu é em inglês, igual ao aparelho de verdade. Estes são os termos que aparecem nele.</p>
+    <div class="gl">
+      <div><b>RF <i>radio frequency</i></b><p>O sinal de rádio que leva o som do bodypack até o receptor. A barra RF mostra a força desse sinal chegando. Sem RF não existe áudio nenhum, por melhor que esteja o microfone.</p></div>
+      <div><b>AF <i>audio frequency</i></b><p>O som em si. A barra AF mostra o quanto a voz está modulando o transmissor. É nela que você vê se o nível está bom, baixo demais ou estourando.</p></div>
+      <div><b>Banco e canal <i>bank, channel</i></b><p>Um banco é um grupo de até 12 frequências que a fábrica calculou para funcionarem juntas sem criar interferência entre si. Dentro do banco você escolhe o canal. Num set com vários sem fio, todos ficam no mesmo banco, em canais diferentes.</p></div>
+      <div><b>Banco U <i>user</i></b><p>O banco livre, onde você digita a frequência na mão, de 25 em 25 kHz. Útil quando nenhum preset serve, mas aí a proteção contra interferência entre canais é por sua conta.</p></div>
+      <div><b>Squelch</b><p>Um portão que corta o áudio quando o sinal de rádio fica fraco demais, para você não ouvir o chiado quando o personagem se afasta. Quanto mais alto o squelch, mais cedo ele corta.</p></div>
+      <div><b>Pilot tone</b><p>Um tom inaudível que o transmissor manda junto com o áudio. O receptor só abre o som se reconhecer esse tom, o que evita pegar qualquer sinal estranho que apareça na mesma frequência.</p></div>
+      <div><b>Sensitivity</b><p>O ganho da entrada do transmissor. É o ajuste que casa o volume da voz com o que o sistema consegue transmitir: baixo demais traz chiado junto, alto demais distorce.</p></div>
+      <div><b>AF Out</b><p>O nível que o receptor entrega para a câmera ou o gravador. Não muda nada do que foi transmitido, só o volume na saída.</p></div>
+      <div><b>Diversity</b><p>O receptor tem duas antenas e vai escolhendo sozinho a que está recebendo melhor. O I ou II no canto da barra de RF mostra qual está ativa naquele instante.</p></div>
+      <div><b>Sync</b><p>Passa frequência, nome e pilot tone do receptor para o transmissor por infravermelho, encostando um no outro. Evita ter que digitar o mesmo canal duas vezes e errar.</p></div>
+      <div><b>Mute</b><p>A chave do bodypack pode cortar só o áudio (AF) ou desligar a transmissão inteira (RF), conforme o Mute Mode. Cortar o RF libera a frequência para outra pessoa usar.</p></div>
+      <div><b>dBm e dBµV</b><p>Unidades de intensidade de rádio. Quanto mais perto de zero, mais forte. Um analisador costuma mostrar em dBm, com valores negativos, e o visor do receptor trabalha em dBµV.</p></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Paisagem de RF</h3>
+    <p id="rf-src">Carregando a varredura…</p>
+    <canvas id="spec" width="900" height="96"></canvas>
+    <div class="fld">
+      <label for="thr">Limite do que conta como ocupado <b id="thr-v">—</b></label>
+      <input type="range" id="thr" min="0" max="100" step="1" value="50">
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <label class="btn2" for="csv" style="display:inline-block">Carregar varredura (.csv)</label>
+      <input type="file" id="csv" accept=".csv,.txt" hidden>
+      <button class="btn2" id="csvclear">Voltar para a de São Paulo</button>
+    </div>
+    <p style="margin:10px 0 0;font-size:.78rem">Duas colunas de números bastam: frequência e nível. Reconheço Hz, kHz ou MHz, vírgula ou ponto decimal, separador vírgula, ponto e vírgula ou tabulação, e ignoro as linhas de cabeçalho.</p>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Exercícios</h3>
+    <p>Faça no aparelho e confira. Nada aqui ajusta nada sozinho.</p>
+    <div class="exgrid" id="exercises"></div>
+  </div>
+
+  <p class="note">Material didático, sem vínculo com o fabricante. A caixa é desenhada de forma genérica de propósito: o que se aprende aqui é a lógica do menu, o comportamento dos botões e o que cada indicador do visor quer dizer. As frequências são as presets de fábrica, e a sensibilidade de −30 dB, o squelch em Low e o AF Out em 0 dB são os valores que o aparelho traz de fábrica. A paisagem de RF que vem carregada é uma varredura real feita em São Paulo, de 469 a 692 MHz, que cobre as duas bandas.</p>
+</div>
+
+<script>
+/* ===================== tabelas de frequência (presets de fábrica) ===================== */
+const BANDS={
+ 'A1':{lo:470,hi:516,t:{
+  1:[470.100,470.500,471.050,471.750,472.200,472.800,473.650,474.750,475.250,506.150,506.950,511.000],
+  2:[476.100,476.500,477.050,478.200,488.100,488.600,489.450,490.050,491.050,491.800,492.250,492.900],
+  3:[488.100,488.500,489.050,489.750,490.200,490.800,491.550,492.750,506.100,507.200,509.250,510.700],
+  4:[494.100,494.500,495.050,495.750,496.200,496.800,497.550,498.750,499.750,471.400,473.750,474.250],
+  5:[500.100,500.500,501.050,501.750,502.200,502.800,503.600,504.800,505.650,471.700,472.450,474.350],
+  6:[506.100,506.500,507.450,508.000,509.250,509.700,510.800,511.700,470.100,474.950,481.500,471.700],
+  7:[470.200,470.600,471.150,471.850,472.300,472.900,473.650,474.850,506.300,508.550,509.400,511.750],
+  8:[488.200,488.600,489.150,489.850,490.700,491.300,492.600,493.050,470.250,470.750,472.250,473.050],
+  9:[476.200,476.600,477.150,477.850,478.300,506.800,507.700,508.350,509.550,510.300,510.900,511.700],
+  10:[488.400,488.850,489.450,490.300,490.800,491.450,492.350,493.050,493.600,471.500,473.150,474.150],
+  11:[470.100,470.500,471.050,471.750,472.200,472.800,473.550,475.700,485.850,488.200,491.200,493.250],
+  12:[478.100,479.050,480.200,480.800,481.550,483.700,484.350,485.150,470.100,471.200,472.100,489.900],
+  13:[486.100,486.500,487.050,487.750,488.200,488.800,489.550,491.700,492.350,493.150,470.100,471.950],
+  14:[494.100,494.500,495.050,495.750,496.200,496.800,497.550,499.700,500.350,501.150,501.650,470.100],
+  15:[502.100,502.500,503.050,503.750,504.200,504.800,505.550,507.700,508.350,509.150,509.650,470.100],
+  16:[510.100,510.500,511.050,511.750,512.250,513.150,513.800,514.250,514.850,515.600,470.100,470.900],
+  17:[470.100,470.850,471.450,471.900,472.550,473.450,473.950,474.650,475.200,475.600,482.850,485.225],
+  18:[476.150,476.650,477.450,478.100,480.250,481.000,483.300,483.700,487.750,489.750,500.400,502.650],
+  19:[470.100,470.500,471.050,471.750,472.800,473.550,474.750,475.750,477.150,479.150,479.950,482.300],
+  20:[470.100,473.600,475.650,477.550,484.750,491.000,492.600,495.450,496.350,500.950,501.450,503.600]}},
+ 'A':{lo:516,hi:558,t:{
+  1:[518.200,518.700,519.650,520.450,520.900,521.600,522.000,522.900,528.800,535.100,552.350,531.600],
+  2:[524.250,524.800,525.550,526.550,527.700,528.100,529.050,529.500,516.950,535.250,536.750,554.900],
+  3:[530.100,530.800,531.650,532.050,533.050,533.550,534.850,535.750,517.300,523.300,547.200,551.050],
+  4:[536.350,537.700,538.650,539.300,540.100,540.700,541.100,541.800,518.900,519.800,550.100,555.050],
+  5:[542.900,543.600,544.450,545.050,545.450,546.200,546.750,547.700,516.900,524.750,551.250,553.200],
+  6:[548.850,549.800,550.250,551.100,551.500,552.150,552.950,553.500,524.050,533.500,537.700,556.900],
+  7:[554.100,554.550,555.200,555.700,556.450,557.050,557.450,558.000,516.300,524.750,533.550,538.250],
+  8:[518.125,518.500,519.000,519.625,520.375,521.375,523.375,525.875,534.125,535.375,537.500,540.125],
+  9:[516.000,516.875,517.500,520.175,522.625,524.800,529.625,530.825,540.525,553.625,516.375,518.425],
+  10:[516.000,516.400,517.000,517.800,519.000,520.600,522.800,526.000,528.400,533.200,537.200,541.600],
+  11:[516.000,516.600,517.400,517.800,520.300,523.600,525.700,522.600,525.200,518.550,524.250,522.200],
+  12:[518.200,518.600,519.200,520.000,521.200,523.600,525.800,524.900,520.475,522.125,522.575,524.475],
+  13:[526.200,526.600,527.200,528.000,529.200,531.600,533.800,532.900,528.475,530.125,530.575,532.475],
+  14:[534.200,534.600,535.200,536.000,537.200,539.600,541.800,540.900,536.475,538.125,538.575,540.475],
+  15:[542.200,542.600,543.200,544.000,545.200,547.600,549.800,548.900,544.475,546.125,546.575,548.475],
+  16:[550.200,550.600,551.200,552.000,553.200,555.600,557.800,556.900,552.475,554.125,554.575,556.475],
+  17:[516.200,516.600,517.200,526.200,527.000,528.200,529.600,531.200,542.400,544.800,547.000,548.800],
+  18:[518.200,518.600,519.200,520.000,525.400,534.200,535.400,539.800,550.600,553.000,555.600,557.600],
+  19:[518.200,518.600,519.200,520.000,521.600,523.800,542.200,543.400,545.100,547.000,549.100,549.600],
+  20:[526.200,526.600,527.200,528.000,529.600,531.800,550.200,551.400,553.100,555.000,557.100,557.600]}},
+ 'B':{lo:626,hi:668,t:{
+  1:[626.200,626.600,627.200,628.400,629.800,631.400,632.200,634.200,637.600,632.650,633.550,635.300],
+  2:[630.200,630.600,631.200,632.000,633.200,635.600,637.800,636.900,632.475,634.125,634.575,636.475],
+  3:[638.200,638.600,639.200,640.000,641.200,643.600,645.800,644.900,640.475,642.125,642.575,644.475],
+  4:[646.200,646.600,647.200,648.000,649.200,651.600,653.800,652.900,648.475,650.125,650.575,652.475],
+  5:[654.200,654.600,655.200,656.000,657.200,659.600,661.800,660.900,656.475,658.125,658.575,660.475],
+  6:[662.200,662.600,664.200,665.400,666.400,667.200,667.800,663.275,664.625],
+  7:[630.200,630.600,631.200,632.000,633.200,634.800,638.600,639.900,642.600,643.100,644.800,645.500],
+  8:[638.200,638.600,639.200,640.000,641.200,642.800,646.600,647.900,650.600,651.100,652.800,653.500],
+  9:[646.200,646.600,647.200,648.000,649.200,650.800,654.600,655.900,658.600,659.100,660.800,661.500],
+  10:[662.600,664.200,665.400,666.400,667.200,667.800,626.200,626.600,627.550,628.250,628.700,629.550],
+  11:[626.200,626.600,627.200,628.000,638.200,639.400,641.000,643.000,645.200,655.600,658.600,661.200],
+  12:[630.200,631.400,633.000,635.000,637.200,646.600,649.200,652.200,662.200,662.600,663.200,664.000],
+  13:[626.200,626.600,627.200,628.400,629.200,654.200,655.600,658.000,659.600,654.700,657.250,660.050],
+  14:[630.200,630.600,631.200,632.000,633.200,634.800,637.000,662.200,664.600,667.800,662.700,666.100],
+  15:[626.200,626.600,627.200,628.000,628.500,629.200,662.200,663.100,664.600,666.300,667.400,663.750],
+  16:[630.200,632.400,634.800,636.000,636.800,637.400,637.800,631.100,631.525,633.425,633.875,635.525],
+  17:[638.200,640.400,642.800,644.000,644.800,645.400,645.800,639.100,639.525,641.425,641.875,643.525],
+  18:[646.200,648.400,650.800,652.000,652.800,653.400,653.800,647.100,647.525,649.425,649.875,651.525],
+  19:[654.200,656.400,658.800,660.000,660.800,661.400,661.800,655.100,655.525,657.425,657.875,659.525],
+  20:[662.200,662.600,663.150,663.850,664.275,664.850,665.650,666.125,666.750,667.650]}},
+ 'C':{lo:734,hi:776,t:{
+  1:[734.200,734.600,735.200,736.000,737.200,739.600,741.800,740.900,736.475,738.125,738.575,740.475],
+  2:[742.200,742.600,743.200,744.000,745.200,747.600,749.800,748.900,744.475,746.125,746.575,748.475],
+  3:[750.200,750.600,751.200,752.000,753.200,755.600,757.800,756.900,752.475,754.125,754.575,756.475],
+  4:[758.200,758.600,759.200,760.000,761.200,763.600,765.800,764.900,760.475,762.125,762.575,764.475],
+  5:[766.200,767.400,769.000,771.200,774.200,774.600,775.200,776.000,766.950,768.050,769.500,772.250],
+  6:[734.200,734.600,735.200,736.000,737.200,738.800,742.600,743.900,746.600,747.100,748.800,749.500],
+  7:[742.200,742.600,743.200,744.000,745.200,746.800,750.600,751.900,754.600,755.100,756.800,757.500],
+  8:[750.200,750.600,751.200,752.000,753.200,754.800,758.600,759.900,762.600,763.100,764.800,765.500],
+  9:[758.200,758.600,759.200,760.000,761.200,762.800,766.600,767.900,770.600,771.100,772.800,773.500],
+  10:[734.200,735.400,737.000,739.000,741.200,750.600,753.200,756.200,766.200,766.600,767.200,768.000],
+  11:[742.200,743.400,745.000,747.000,749.200,758.600,761.200,764.200,774.200,774.600,775.200,776.000],
+  12:[734.200,734.600,735.200,736.000,737.600,739.800,758.200,759.400,761.100,763.000,765.100,765.600],
+  13:[742.200,742.600,743.200,744.000,745.600,747.800,766.200,767.400,769.100,771.000,773.100,773.600],
+  14:[734.600,735.200,736.000,737.200,738.800,741.000,766.200,766.600,769.600,770.600,767.300,769.100],
+  15:[742.200,742.600,743.200,744.000,745.200,746.800,749.100,774.200,774.625,775.250,775.700],
+  16:[734.200,736.400,738.800,740.000,740.800,741.400,741.800,735.100,735.525,737.425,737.875,739.525],
+  17:[742.200,744.400,746.800,748.000,748.800,749.400,749.800,743.100,743.525,745.425,745.875,747.525],
+  18:[750.200,752.400,754.800,756.000,756.800,757.400,757.800,751.100,751.525,753.425,753.875,755.525],
+  19:[758.200,760.400,762.800,764.000,764.800,765.400,765.800,759.100,759.525,761.425,761.875,763.525],
+  20:[766.200,768.400,770.800,772.000,772.800,773.400,773.800,766.700,769.900,774.350,775.050]}}
+};
+let band='B', TBL=BANDS[band].t, LO=BANDS[band].lo, HI=BANDS[band].hi;
+let U=[], thrPct=50, cutDb=0, loL=0, hiL=0;
+function makeU(){U=[];for(let i=0;i<12;i++)U.push(+(LO+0.2+i*0.025).toFixed(3));}
+makeU();
+
+/* varredura real feita em São Paulo: 469,1 a 692,1 MHz de 0,1 em 0,1, nível em dBm */
+const SP={f0:469.1,st:0.1,lv:"-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-286,-428,-428,-428,-428,-299,-303,-298,-295,-291,-286,-288,-289,-289,-286,-282,-279,-279,-276,-277,-276,-276,-280,-290,-296,-300,-292,-285,-279,-275,-273,-271,-269,-271,-269,-268,-268,-269,-268,-267,-270,-270,-271,-274,-273,-272,-271,-263,-262,-263,-268,-273,-275,-272,-271,-272,-276,-282,-287,-302,-333,-373,-333,-288,-272,-261,-248,-237,-231,-230,-232,-240,-244,-242,-230,-227,-229,-232,-241,-248,-247,-239,-232,-232,-234,-234,-232,-229,-225,-224,-226,-230,-235,-239,-240,-241,-241,-242,-247,-249,-244,-235,-231,-229,-228,-230,-233,-239,-242,-243,-248,-255,-258,-261,-263,-258,-257,-255,-255,-259,-283,-336,-359,-321,-301,-296,-293,-291,-290,-290,-294,-302,-313,-322,-322,-318,-316,-312,-309,-308,-310,-311,-312,-315,-319,-320,-313,-309,-307,-312,-304,-290,-285,-284,-285,-283,-288,-293,-300,-315,-336,-345,-329,-314,-304,-296,-294,-296,-298,-298,-296,-291,-288,-290,-299,-314,-316,-301,-290,-292,-316,-366,-356,-324,-309,-305,-297,-295,-297,-302,-289,-278,-276,-285,-285,-287,-288,-293,-295,-290,-284,-280,-279,-278,-278,-277,-276,-276,-280,-286,-298,-287,-281,-278,-283,-293,-298,-289,-278,-273,-276,-282,-292,-305,-301,-298,-297,-308,-308,-301,-303,-307,-302,-294,-294,-302,-301,-289,-282,-286,-310,-330,-274,-237,-226,-229,-240,-252,-263,-266,-261,-257,-255,-241,-231,-228,-229,-230,-229,-229,-228,-226,-223,-219,-223,-232,-244,-248,-247,-248,-246,-244,-250,-253,-250,-249,-248,-246,-246,-251,-255,-245,-240,-242,-248,-253,-248,-238,-233,-236,-244,-249,-242,-239,-240,-245,-246,-255,-267,-287,-309,-355,-415,-409,-407,-404,-409,-409,-409,-404,-407,-407,-409,-407,-407,-409,-393,-377,-379,-402,-412,-409,-404,-412,-409,-409,-409,-409,-412,-412,-409,-409,-409,-409,-412,-409,-407,-398,-384,-393,-398,-400,-404,-407,-412,-409,-409,-412,-409,-412,-409,-409,-409,-415,-412,-418,-421,-398,-387,-391,-407,-371,-308,-271,-254,-246,-249,-253,-244,-237,-236,-237,-245,-253,-257,-256,-253,-250,-249,-245,-249,-259,-263,-263,-265,-262,-254,-254,-269,-282,-274,-271,-255,-249,-248,-250,-249,-253,-254,-251,-250,-244,-244,-247,-250,-256,-264,-266,-271,-268,-252,-241,-231,-227,-226,-230,-233,-240,-252,-270,-298,-352,-340,-302,-284,-278,-285,-303,-300,-297,-299,-302,-307,-313,-317,-315,-302,-289,-286,-291,-295,-299,-295,-296,-300,-309,-319,-318,-308,-304,-300,-297,-301,-302,-297,-292,-289,-287,-294,-299,-302,-310,-306,-298,-295,-297,-301,-299,-297,-296,-293,-295,-298,-298,-298,-298,-295,-292,-294,-304,-327,-361,-306,-263,-248,-245,-244,-240,-237,-233,-231,-231,-233,-233,-232,-226,-223,-222,-225,-229,-235,-238,-237,-234,-231,-232,-234,-239,-239,-236,-234,-235,-237,-244,-248,-247,-247,-247,-247,-246,-246,-251,-245,-239,-239,-241,-247,-249,-253,-248,-239,-235,-233,-232,-232,-232,-230,-230,-232,-241,-267,-304,-287,-252,-234,-232,-231,-231,-234,-237,-239,-233,-224,-221,-222,-228,-236,-235,-226,-219,-216,-216,-223,-231,-237,-238,-229,-223,-218,-220,-228,-236,-242,-238,-232,-225,-225,-229,-230,-228,-227,-222,-221,-227,-230,-235,-227,-222,-218,-216,-219,-220,-220,-217,-214,-212,-215,-224,-234,-240,-265,-324,-312,-269,-251,-243,-240,-243,-248,-250,-254,-259,-254,-255,-261,-273,-286,-273,-256,-246,-243,-246,-251,-252,-257,-261,-258,-251,-246,-245,-250,-258,-264,-261,-261,-262,-262,-260,-269,-283,-276,-267,-259,-254,-253,-252,-257,-264,-269,-264,-252,-247,-247,-243,-243,-243,-250,-262,-256,-258,-279,-331,-334,-294,-278,-272,-273,-280,-285,-282,-283,-286,-278,-274,-272,-271,-273,-278,-279,-282,-276,-290,-289,-289,-291,-291,-289,-288,-286,-291,-298,-303,-286,-291,-286,-281,-275,-274,-271,-265,-261,-260,-261,-265,-270,-275,-280,-284,-284,-280,-276,-277,-278,-279,-281,-280,-277,-271,-269,-272,-294,-342,-301,-263,-245,-243,-245,-245,-242,-239,-239,-241,-239,-238,-242,-248,-246,-237,-233,-231,-228,-228,-227,-226,-226,-229,-235,-248,-251,-247,-242,-245,-249,-255,-255,-250,-250,-251,-252,-258,-260,-267,-262,-255,-251,-246,-239,-229,-223,-220,-220,-220,-220,-223,-227,-233,-236,-241,-250,-265,-280,-321,-315,-282,-273,-272,-277,-282,-282,-282,-281,-284,-282,-274,-272,-269,-264,-257,-256,-254,-256,-263,-272,-275,-278,-276,-269,-260,-256,-257,-259,-262,-265,-269,-278,-296,-308,-314,-303,-293,-288,-278,-274,-274,-271,-269,-267,-258,-251,-249,-247,-249,-253,-258,-264,-268,-267,-266,-268,-274,-294,-320,-290,-251,-236,-228,-227,-226,-229,-233,-231,-231,-226,-219,-217,-215,-216,-216,-218,-221,-220,-220,-218,-219,-218,-216,-220,-223,-226,-222,-220,-220,-221,-226,-230,-230,-226,-221,-221,-223,-225,-227,-226,-224,-224,-229,-229,-229,-229,-225,-225,-226,-225,-225,-227,-226,-224,-221,-221,-230,-256,-309,-309,-272,-256,-251,-250,-247,-249,-251,-250,-248,-249,-252,-249,-246,-244,-248,-249,-242,-237,-237,-244,-252,-256,-256,-252,-248,-246,-247,-249,-250,-246,-243,-246,-247,-247,-248,-251,-261,-269,-268,-263,-260,-256,-249,-241,-237,-237,-241,-248,-248,-245,-243,-248,-252,-254,-264,-278,-292,-317,-371,-342,-302,-284,-279,-279,-282,-286,-290,-291,-290,-287,-285,-286,-291,-301,-305,-302,-297,-295,-299,-302,-304,-298,-288,-281,-279,-278,-282,-287,-289,-290,-289,-287,-288,-290,-295,-292,-284,-279,-274,-272,-274,-278,-277,-276,-276,-279,-282,-286,-288,-287,-283,-279,-277,-278,-281,-285,-296,-322,-353,-313,-276,-255,-248,-247,-248,-248,-246,-242,-241,-243,-244,-246,-249,-249,-249,-248,-246,-244,-243,-246,-246,-246,-246,-246,-249,-252,-254,-254,-255,-255,-252,-253,-254,-254,-253,-254,-255,-249,-247,-245,-246,-250,-252,-252,-249,-246,-244,-240,-239,-237,-238,-238,-238,-240,-243,-248,-257,-278,-322,-339,-302,-284,-278,-279,-283,-291,-298,-292,-288,-281,-275,-271,-271,-275,-276,-276,-275,-277,-281,-289,-298,-304,-300,-301,-306,-306,-302,-299,-297,-299,-301,-304,-309,-317,-307,-299,-295,-296,-297,-296,-293,-285,-281,-281,-283,-289,-300,-305,-300,-296,-299,-304,-314,-315,-308,-303,-307,-332,-379,-323,-284,-268,-264,-267,-274,-284,-296,-297,-288,-280,-275,-269,-263,-262,-261,-262,-261,-262,-260,-265,-268,-277,-283,-283,-279,-273,-266,-262,-258,-257,-257,-260,-267,-270,-281,-288,-297,-300,-289,-284,-278,-271,-269,-266,-264,-262,-264,-267,-271,-278,-289,-290,-284,-279,-277,-273,-277,-299,-351,-313,-269,-254,-244,-241,-239,-239,-240,-243,-248,-255,-265,-272,-270,-263,-258,-253,-250,-250,-252,-251,-252,-253,-255,-259,-265,-263,-255,-245,-238,-232,-229,-229,-229,-235,-234,-238,-240,-245,-252,-262,-262,-255,-251,-249,-249,-252,-250,-250,-250,-252,-255,-257,-254,-250,-245,-243,-251,-271,-328,-359,-319,-302,-295,-296,-296,-297,-298,-296,-293,-296,-299,-305,-307,-302,-294,-294,-295,-299,-309,-305,-301,-299,-301,-305,-311,-315,-313,-313,-312,-309,-304,-297,-293,-297,-304,-309,-311,-309,-304,-301,-298,-298,-302,-311,-321,-314,-313,-314,-313,-311,-310,-313,-319,-320,-325,-331,-335,-355,-361,-353,-313,-292,-282,-279,-281,-281,-274,-276,-283,-295,-305,-299,-293,-295,-302,-305,-307,-304,-301,-301,-292,-286,-287,-294,-297,-297,-295,-296,-294,-281,-272,-273,-273,-271,-274,-280,-286,-294,-292,-282,-279,-286,-295,-287,-281,-280,-280,-278,-278,-281,-282,-283,-284,-289,-291,-296,-297,-320,-368,-402,-400,-391,-428,-428,-428,-428,-428,-428,-428,-428,-428,-425,-428,-425,-421,-425,-421,-421,-412,-409,-415,-409,-397,-418,-428,-404,-428,-425,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-407,-415,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-422,-428,-428,-388,-323,-312,-291,-282,-279,-276,-275,-276,-278,-277,-279,-280,-281,-285,-287,-286,-287,-290,-295,-291,-280,-274,-274,-280,-288,-290,-285,-286,-283,-281,-278,-273,-271,-269,-266,-269,-273,-277,-284,-293,-296,-289,-285,-287,-288,-274,-274,-266,-266,-266,-269,-271,-273,-276,-283,-300,-295,-295,-309,-357,-375,-334,-321,-317,-316,-323,-329,-348,-350,-340,-332,-331,-326,-323,-314,-319,-318,-310,-311,-315,-320,-322,-320,-316,-318,-316,-314,-314,-317,-320,-327,-323,-317,-312,-309,-309,-307,-308,-311,-314,-314,-324,-318,-307,-302,-307,-316,-322,-321,-327,-324,-324,-318,-315,-315,-328,-344,-351,-366,-416,-375,-338,-320,-317,-317,-322,-330,-326,-318,-329,-345,-365,-373,-361,-349,-339,-334,-327,-327,-330,-324,-321,-320,-322,-325,-323,-328,-328,-329,-331,-332,-335,-335,-336,-335,-348,-331,-331,-334,-337,-341,-340,-338,-329,-325,-325,-328,-329,-331,-322,-313,-310,-310,-311,-314,-314,-315,-320,-339,-389,-369,-335,-323,-311,-304,-304,-306,-309,-317,-323,-325,-320,-314,-308,-300,-296,-297,-299,-303,-308,-316,-321,-327,-315,-302,-297,-292,-293,-296,-299,-302,-302,-302,-305,-307,-317,-316,-320,-316,-310,-302,-297,-295,-296,-303,-308,-314,-318,-318,-318,-324,-332,-335,-333,-331,-332,-333,-338,-354,-400,-428,-403,-290,-397,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-422,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-364,-428,-428,-428,-428,-428,-428,-428,-428,-377,-428,-422,-411,-332,-301,-289,-286,-288,-290,-290,-295,-299,-301,-299,-293,-290,-292,-300,-301,-310,-306,-301,-298,-300,-304,-310,-316,-310,-297,-289,-289,-290,-296,-303,-303,-305,-303,-296,-291,-288,-287,-289,-293,-296,-296,-295,-299,-306,-312,-318,-319,-322,-313,-301,-292,-286,-283,-286,-288,-292,-298,-315,-372,-407,-369,-353,-345,-342,-341,-342,-343,-345,-345,-345,-343,-343,-341,-333,-351,-355,-359,-357,-353,-352,-350,-352,-353,-355,-353,-351,-339,-335,-331,-333,-336,-340,-346,-347,-351,-350,-345,-346,-352,-353,-353,-355,-354,-352,-351,-344,-344,-345,-345,-351,-355,-351,-351,-347,-348,-355,-365,-389,-428,-403,-355,-341,-338,-340,-341,-346,-352,-349,-352,-349,-348,-349,-346,-345,-345,-348,-345,-339,-340,-344,-342,-339,-341,-345,-342,-341,-339,-341,-339,-338,-342,-349,-349,-354,-357,-372,-368,-357,-353,-348,-347,-345,-344,-343,-344,-341,-341,-343,-348,-353,-359,-360,-359,-355,-356,-353,-359,-375,-428,-380,-348,-338,-327,-319,-315,-311,-307,-309,-313,-306,-301,-300,-299,-302,-300,-304,-306,-299,-299,-299,-303,-307,-306,-303,-303,-307,-310,-305,-306,-302,-302,-303,-305,-309,-314,-316,-318,-323,-335,-338,-324,-322,-309,-309,-312,-315,-325,-335,-338,-328,-317,-311,-307,-310,-311,-312,-316,-329,-386,-397,-363,-354,-353,-359,-360,-363,-364,-363,-356,-353,-353,-350,-346,-346,-345,-348,-352,-356,-360,-359,-351,-346,-348,-347,-353,-351,-350,-350,-352,-358,-364,-361,-356,-349,-345,-345,-345,-344,-345,-342,-340,-344,-347,-353,-357,-357,-354,-357,-360,-361,-359,-346,-340,-336,-338,-343,-351,-366,-416,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-328,-428,-428,-428,-428,-346,-411,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428,-411,-372,-355,-341,-341,-346,-353,-355,-345,-355,-361,-352,-341,-331,-326,-335,-344,-335,-332,-337,-347,-341,-335,-343,-349,-343,-340,-340,-345,-348,-330,-325,-323,-332,-338,-339,-333,-336,-342,-338,-327,-326,-329,-348,-347,-339,-334,-329,-323,-323,-329,-333,-333,-328,-329,-337,-348,-357,-370,-411,-411,-382,-370,-364,-360,-363,-369,-369,-364,-369,-372,-372,-380,-380,-378,-292,-373,-377,-380,-386,-397,-403,-386,-386,-386,-382,-389,-391,-391,-391,-377,-375,-370,-373,-380,-391,-397,-397,-394,-394,-400,-407,-400,-382,-380,-377,-372,-373,-369,-428,-428,-428,-428,-428,-428,-428,-428,-428,-428"};
+let scanAll=null, scanName='', bp=[], floorDb=0, hasScan=false;
+let ambNow=0, ambKey='';
+function loadSP(){
+  const a=SP.lv.split(',');
+  scanAll=a.map((v,i)=>({f:+(SP.f0+i*SP.st).toFixed(3),l:+v/4}));
+  scanName='Varredura real em São Paulo';
+}
+
+const SQ={'Off':0,'Low':5,'Middle':15,'High':25};
+const CHARS=" ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+const f3=v=>v.toFixed(3);
+const chans=b=>b==='U'?U.length:TBL[b].length;
+const freqOf=(b,c)=>b==='U'?U[Math.min(c,U.length)-1]:TBL[b][Math.min(c,TBL[b].length)-1];
+
+/* paisagem simulada, usada quando a varredura não cobre a banda */
+const simBusy=()=>[[LO+12,LO+18],[LO+28,LO+34]];
+/* o slider vai do fundo ao topo do gráfico: 0% encosta no chão, 100% no pico */
+function cutFromPct(){ cutDb = loL + (hiL-loL)*thrPct/100; }
+function refreshScan(reset){
+  bp = scanAll ? scanAll.filter(p=>p.f>=LO-0.1&&p.f<=HI+0.1) : [];
+  hasScan = bp.length>=20;
+  if(hasScan){
+    const s=bp.map(p=>p.l).sort((a,b)=>a-b);
+    floorDb=s[Math.floor(s.length*0.3)];
+    loL=s[0]; hiL=s[s.length-1];
+    if(reset!==false){ /* começa logo acima do ponto mais baixo da varredura */
+      thrPct=Math.max(1,Math.min(98,(loL+7-loL)/Math.max(1,hiL-loL)*100));
+      const el=document.getElementById('thr'); if(el) el.value=Math.round(thrPct);
+    }
+    cutFromPct();
+  }
+  if(typeof rx!=='undefined'){ rx.banks=null; if(reset!==false) pickStart(); }
+  updSrc(); drawSpec();
+}
+function occupied(f){
+  if(hasScan){
+    let best=null,bd=9;
+    for(const p of bp){const d=Math.abs(p.f-f); if(d<bd){bd=d;best=p;}}
+    return best&&bd<=0.15 ? best.l>cutDb : false;
+  }
+  return simBusy().some(([a,b])=>f>=a&&f<b);
+}
+function updSrc(){
+  const el=document.getElementById('rf-src'), v=document.getElementById('thr-v'); if(!el) return;
+  if(hasScan){
+    el.textContent=`${scanName}. Tudo acima da linha tracejada conta como ocupado.`;
+    if(v) v.textContent=cutDb.toFixed(1)+' dBm';
+  } else {
+    el.textContent=scanAll
+      ? `A varredura carregada não cobre a banda ${band}, então o scan usa duas faixas de TV simuladas.`
+      : `Sem varredura: o scan usa duas faixas de TV simuladas.`;
+    if(v) v.textContent='—';
+  }
+}
+
+/* ===================== estado ===================== */
+function base(kind){return{kind,power:true,disp:0,bank:1,ch:1,name:'ew100 G3',
+  pilot:'Active',autoLock:'Inactive',contrast:8,locked:false,lockT:0,
+  scr:'std',path:[],idx:0,tmp:null,full:null,fullT:0,fullThen:null,lit:0};}
+const rx=Object.assign(base('rx'),{squelch:'Low',afOut:0,banks:null,scanP:null});
+const tx=Object.assign(base('tx'),{sens:-30,muteMode:'AF On/Off',cable:'Off',muteSw:false,rfMute:false});
+const D={rx,tx};
+Object.defineProperty(tx,'afMuted',{get(){return tx.muteSw&&tx.muteMode==='AF On/Off';}});
+let voice=55, dist=10, lastT=performance.now();
+let afNow=0, afHold=0, afHoldT=0, clipT=0;
+
+/* ===================== fala e desvanecimento ===================== */
+/* relógio que só cresce: os prazos são absolutos, nunca reiniciam junto com a frase */
+const sp={clock:0,env:0,target:0.4,tSyl:0,tPhrase:2.5,speaking:true};
+function speech(dt){
+  sp.clock+=dt;
+  if(sp.clock>=sp.tPhrase){
+    sp.speaking=!sp.speaking;
+    sp.tPhrase=sp.clock+(sp.speaking?1.8+Math.random()*3.2:0.35+Math.random()*1.15);
+  }
+  if(sp.clock>=sp.tSyl){
+    sp.tSyl=sp.clock+0.07+Math.random()*0.13;
+    sp.target=sp.speaking?0.28+Math.random()*0.72:0.012;
+  }
+  const k=sp.target>sp.env?17:6;
+  sp.env+=(sp.target-sp.env)*Math.min(1,k*dt);
+  return sp.env;
+}
+const fade={clock:0,v:0,target:0,tNext:0};
+function fading(dt){
+  fade.clock+=dt;
+  if(fade.clock>=fade.tNext){fade.tNext=fade.clock+0.55+Math.random()*1.1;fade.target=Math.random()*2-1;}
+  fade.v+=(fade.target-fade.v)*Math.min(1,2.4*dt);
+  return fade.v;
+}
+
+/* ===================== RF e áudio ===================== */
+/* barra cheia até ~10 m, metade aos 20 m, cai depressa de 20 a 40 */
+function rfBase(d){
+  if(d<=10) return 72;
+  if(d<=20) return 72-(d-10)*3.6;
+  if(d>=40) return 0;
+  return 36*Math.pow(1-(d-20)/20,1.6);
+}
+function rfRaw(){
+  if(!rx.power||!tx.power||tx.rfMute) return 0;
+  if(Math.abs(freqOf(rx.bank,rx.ch)-freqOf(tx.bank,tx.ch))>0.0005) return 0;
+  const wob=fade.v*(0.8+dist*0.18);
+  return Math.max(0,rfBase(dist)+wob);
+}
+/* energia que já existe numa frequência, venha ela do nosso transmissor ou não */
+function ambAt(f){
+  if(!hasScan) return 0;
+  let best=null,bd=9;
+  for(const p of bp){const d=Math.abs(p.f-f); if(d<bd){bd=d;best=p;}}
+  if(!best||bd>0.15) return 0;
+  const top=Math.max(cutDb+1,hiL), r=(best.l-cutDb)/(top-cutDb);
+  return r<=0 ? 0 : Math.min(62, r*62);
+}
+const ambSeg=f=>Math.min(12,Math.round(ambAt(f)/72*12));
+function updAmb(){
+  const f=freqOf(rx.bank,rx.ch), key=f+'|'+cutDb.toFixed(2)+'|'+band+'|'+(hasScan?1:0);
+  if(key===ambKey) return; ambKey=key;
+  ambNow=ambAt(f);
+  drawSpec();
+}
+/* cenário de abertura: receptor numa frequência meio suja, bodypack noutra limpa.
+   Os dois chegam despareados de propósito, para o aluno ter que parear. */
+function pickStart(){
+  ambKey='';
+  if(!hasScan){rx.bank=1;rx.ch=1;tx.bank=2;tx.ch=1;return;}
+  let r=null;
+  for(const b of Object.keys(TBL)) for(let c=1;c<=TBL[b].length;c++){
+    const f=TBL[b][c-1], d=Math.abs(ambSeg(f)-4);
+    if(!r||d<r.d||(d===r.d&&f<r.f)) r={b:+b,c,f,d};
+  }
+  rx.bank=r.b; rx.ch=r.c;
+  let t=null;
+  for(const b of Object.keys(TBL)){
+    if(+b===rx.bank) continue;
+    for(let c=1;c<=TBL[b].length;c++){
+      const f=TBL[b][c-1];
+      if(Math.abs(f-r.f)<0.001||ambSeg(f)>0) continue;
+      if(!t||f<t.f) t={b:+b,c,f};
+    }
+  }
+  if(t){tx.bank=t.b;tx.ch=t.c;} else {tx.bank=rx.bank===1?2:1;tx.ch=1;}
+}
+function link(){
+  const amb=ambNow;
+  const dif=Math.abs(freqOf(rx.bank,rx.ch)-freqOf(tx.bank,tx.ch))>0.0005;
+  if(!rx.power) return {rf:0,bar:0,audio:false,lock:false,why:'receptor desligado'};
+  const r=rfRaw(), bar=Math.max(r,amb);
+  if(r<=0.5) return {rf:0,bar,audio:false,lock:false,why:!tx.power?'transmissor desligado':
+    tx.rfMute?'RF do transmissor desativado':dif?'frequências diferentes':'longe demais'};
+  if(r<SQ[rx.squelch]) return {rf:r,bar,audio:false,lock:false,why:'sinal abaixo do squelch'};
+  if(rx.pilot==='Active'&&tx.pilot!=='Active') return {rf:r,bar,audio:false,lock:false,why:'o transmissor não manda pilot tone'};
+  if(tx.afMuted) return {rf:r,bar,audio:false,lock:true,why:'áudio do transmissor em mute'};
+  return {rf:r,bar,audio:true,lock:true,why:''};
+}
+/* 100 é o topo da escala: é exatamente onde o último segmento acende e o AF PEAK dispara */
+function afTarget(){
+  if(!tx.power||tx.afMuted) return 0;
+  return Math.min(145, voice*0.70*sp.env*Math.pow(10,(tx.sens+30)/20));
+}
+
+/* ===================== menus ===================== */
+const MENU={
+ rx:{main:{t:'Menu',i:['Sync','Squelch','Easy Setup','Frequency Preset','Name','AF Out','Auto Lock','Advanced','Exit']},
+     easy:{t:'Easy Setup',i:['Reset List','Current List','Scan New List','Exit']},
+     adv:{t:'Advanced Menu',i:['Tune','Pilot Tone','LCD Contrast','Reset','Software Revision','Exit']}},
+ tx:{main:{t:'Menu',i:['Sensitivity','Frequency Preset','Name','Auto Lock','Advanced','Exit']},
+     adv:{t:'Advanced Menu',i:['Tune','Mute Mode','Cable Emulation','Pilot Tone','LCD Contrast','Reset','Software Revision','Exit']}}
+};
+const cur=d=>MENU[d.kind][d.path[d.path.length-1]||'main'];
+const item=d=>cur(d).i[d.idx];
+function val(d,it){switch(it){
+  case 'Squelch':return d.squelch;
+  case 'AF Out':return (d.afOut>0?'+':'')+d.afOut+' dB';
+  case 'Sensitivity':return d.sens+' dB';
+  case 'Name':return d.name;
+  case 'Frequency Preset':return 'B.Ch: '+d.bank+'.'+d.ch;
+  case 'Auto Lock':return d.autoLock;
+  case 'Pilot Tone':return d.pilot;
+  case 'LCD Contrast':return String(d.contrast);
+  case 'Tune':return f3(freqOf(d.bank,d.ch))+' MHz';
+  case 'Mute Mode':return d.muteMode;
+  case 'Cable Emulation':return d.cable;
+  case 'Software Revision':return '1.2.0';
+  default:return '';}}
+
+/* ===================== botões ===================== */
+function show(d,t,ms,then){d.full=t;d.fullT=ms;d.fullThen=then||null;d.lit=0;}
+function press(d,b,long){
+  d.lit=0;
+  if(!d.power){ if(b==='onoff'&&!long){d.power=true;d.scr='std';d.locked=d.autoLock==='Active';d.lockT=0;} return; }
+  if(b==='onoff'&&long){ show(d,'OFF',700,()=>{d.power=false;d.scr='std';d.path=[];d.full=null;}); return; }
+  if(d.full&&d.full!=='Locked'&&d.full!=='Unlock?') return;
+  if(d.locked){
+    if(d.full==='Locked'&&(b==='up'||b==='down')){show(d,'Unlock?',2500);return;}
+    if(d.full==='Unlock?'&&b==='set'){d.locked=false;d.lockT=0;d.full=null;return;}
+    if(b==='set'){show(d,'Locked',2000);return;}
+    return;
+  }
+  if(d.scr==='std'){
+    if(b==='set'){d.scr='menu';d.path=[];d.idx=0;}
+    else if(b==='onoff'){d.disp=(d.disp+1)%(d.kind==='rx'?2:3);}
+    return;
+  }
+  if(d.scr==='sync'){ if(b==='onoff') show(d,'sync ✗',1200,()=>{d.scr='std';}); return; }
+  if(d.scr==='scan') return;
+  if(d.scr==='menu'){
+    const m=cur(d);
+    if(b==='up'){d.idx=(d.idx-1+m.i.length)%m.i.length;return;}
+    if(b==='down'){d.idx=(d.idx+1)%m.i.length;return;}
+    if(b==='onoff'){ if(d.path.length){d.path.pop();d.idx=0;} else d.scr='std'; return; }
+    if(b==='set') return enter(d,item(d));
+    return;
+  }
+  if(d.scr==='edit') return editKey(d,b);
+}
+function enter(d,it){
+  switch(it){
+    case 'Exit': if(d.path.length){d.path.pop();d.idx=0;} else d.scr='std'; return;
+    case 'Advanced': d.path.push('adv');d.idx=0;return;
+    case 'Easy Setup': d.path.push('easy');d.idx=0;return;
+    case 'Sync': d.scr='sync';return;
+    case 'Scan New List': d.scr='scan';d.scanP=0;return;
+    case 'Current List':
+      if(!d.banks) d.banks=scanBanks();
+      d.scr='edit';d.tmp={k:'bank',b:d.bank,c:d.ch,easy:true};return;
+    case 'Reset List': d.banks=null;show(d,'Stored',900);return;
+    case 'Software Revision': d.scr='edit';d.tmp={k:'ro'};return;
+    case 'Reset': d.scr='edit';d.tmp={k:'reset'};return;
+    case 'Frequency Preset': d.scr='edit';d.tmp={k:'bank',b:d.bank,c:d.ch};return;
+    case 'Name': d.scr='edit';d.tmp={k:'name',s:(d.name+'        ').slice(0,8).split(''),p:0};return;
+    case 'Tune': d.scr='edit';d.tmp={k:'uch',c:d.bank==='U'?d.ch:1};return;
+    default: d.scr='edit';d.tmp={k:'val'};return;
+  }
+}
+const cyc=(a,v,s)=>a[(a.indexOf(v)+s+a.length)%a.length];
+function editKey(d,b){
+  const t=d.tmp, it=item(d), s=b==='up'?1:b==='down'?-1:0;
+  if(b==='onoff'){d.scr='menu';d.tmp=null;return;}
+  if(t.k==='ro'){ if(b==='set'){d.scr='menu';d.tmp=null;} return; }
+  if(t.k==='reset'){
+    if(b==='set'){
+      const k=d.kind;
+      Object.assign(d,base(k),k==='rx'?{squelch:'Low',afOut:0,banks:null}:{sens:-30,muteMode:'AF On/Off',cable:'Off'});
+      show(d,'Stored',900,()=>{d.scr='std';d.path=[];});
+    } return;
+  }
+  if(t.k==='bank'){
+    const list=t.easy?Object.keys(d.banks).map(Number):[...Object.keys(TBL).map(Number),'U'];
+    if(s){let i=list.indexOf(t.b); if(i<0)i=0; t.b=list[(i+s+list.length)%list.length]; t.c=Math.min(t.c,chans(t.b));}
+    if(b==='set') t.k='chan';
+    return;
+  }
+  if(t.k==='chan'){
+    if(s){const n=chans(t.b); t.c=((t.c-1+s+n)%n)+1;}
+    if(b==='set'){d.bank=t.b;d.ch=t.c;show(d,'Stored',900,()=>{d.scr='menu';d.tmp=null;});}
+    return;
+  }
+  if(t.k==='uch'){
+    if(s){const n=U.length;t.c=((t.c-1+s+n)%n)+1;}
+    if(b==='set') t.k='ufreq';
+    return;
+  }
+  if(t.k==='ufreq'){
+    if(s) U[t.c-1]=+Math.min(HI,Math.max(LO,U[t.c-1]+s*0.025)).toFixed(3);
+    if(b==='set'){d.bank='U';d.ch=t.c;show(d,'Stored',900,()=>{d.scr='menu';d.tmp=null;});}
+    return;
+  }
+  if(t.k==='name'){
+    if(s){const i=CHARS.indexOf(t.s[t.p]); t.s[t.p]=CHARS[(i+s+CHARS.length)%CHARS.length];}
+    if(b==='set'){ t.p++;
+      if(t.p>=8){d.name=t.s.join('').replace(/\s+$/,'')||' ';show(d,'Stored',900,()=>{d.scr='menu';d.tmp=null;});}}
+    return;
+  }
+  if(s) switch(it){
+    case 'Squelch': d.squelch=cyc(['Off','Low','Middle','High'],d.squelch,s);break;
+    case 'AF Out': d.afOut=Math.max(-30,Math.min(12,d.afOut+s*6));break;
+    case 'Sensitivity': d.sens=Math.max(-60,Math.min(0,d.sens+s*3));break;
+    case 'Auto Lock': d.autoLock=d.autoLock==='Active'?'Inactive':'Active';break;
+    case 'Pilot Tone': d.pilot=d.pilot==='Active'?'Inactive':'Active';break;
+    case 'LCD Contrast': d.contrast=Math.max(1,Math.min(16,d.contrast+s));break;
+    case 'Mute Mode': d.muteMode=cyc(['AF On/Off','RF On/Off','Disabled'],d.muteMode,s);break;
+    case 'Cable Emulation': d.cable=cyc(['Off','Type 1','Type 2','Type 3'],d.cable,s);break;
+  }
+  if(b==='set'){
+    if(d.kind==='tx') tx.rfMute = tx.muteSw && tx.muteMode==='RF On/Off';
+    show(d,'Stored',900,()=>{d.scr='menu';d.tmp=null;});
+  }
+}
+function scanBanks(){
+  const o={};
+  for(const b of Object.keys(TBL)){
+    let free=0;
+    for(const f of TBL[b]){
+      const taken=occupied(f)||(tx.power&&!tx.rfMute&&Math.abs(f-freqOf(tx.bank,tx.ch))<0.0005);
+      if(!taken) free++;
+    }
+    o[b]=free;
+  }
+  return o;
+}
+
+/* ===================== visor ===================== */
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const line=(l,r,c)=>`<div class="ln ${c||''}">${l!==''?`<span>${l}</span>`:''}<span class="grow"></span>${r?`<span>${r}</span>`:''}</div>`;
+const batt=()=>'<span class="bt"><i></i><i></i><i></i></span>';
+function segs(n,on,hold){let h='';for(let i=0;i<n;i++){
+  const cls=i<on?'on':(hold!=null&&i===hold?'hold':'');h+=`<div class="seg ${cls}"></div>`;}return h;}
+function bars(d){
+  const L=link();
+  const af=Math.min(12,Math.round(afNow/100*12)), afh=Math.min(12,Math.round(afHold/100*12))-1;
+  if(d.kind==='rx'){
+    const rfn=Math.min(12,Math.round(L.bar/72*12)), sqp=SQ[rx.squelch]/72*100;
+    const a=L.audio?af:0, ah=L.audio?afh:-1;
+    return `<div class="meters">
+      <div class="mtr"><div class="ant">${L.bar>0?'I':'&nbsp;'}</div><div class="bar">${segs(12,rfn)}
+        ${rx.squelch!=='Off'?`<div class="sq" style="bottom:${sqp}%"></div>`:''}</div><span>RF</span></div>
+      <div class="mtr"><div class="ant">&nbsp;</div><div class="bar">${segs(12,a,ah)}</div><span>AF</span></div></div>`;
+  }
+  return `<div class="meters"><div class="mtr"><div class="ant">&nbsp;</div>
+    <div class="bar">${segs(12,af,afh)}</div><span>AF</span></div></div>`;
+}
+function stdLines(d){
+  const f=f3(freqOf(d.bank,d.ch)), L=link(), lock=d.locked?'<span class="lk"></span>':'';
+  if(d.kind==='rx'){
+    if(d.disp===0){
+      const m=(!L.audio)?'<span class="inv">MUTE</span>':'';
+      return line(f+'MHz',lock)+line(esc(d.name),'')+line((d.pilot==='Active'?'P ':'')+m,batt());
+    }
+    return line('B.Ch: '+d.bank+'.'+d.ch,lock)+line(esc(d.name),'')+
+      line((d.pilot==='Active'?'P ':'')+((d.afOut>0?'+':'')+d.afOut),batt());
+  }
+  const ant=(!d.rfMute)?'↑':'', m=(d.afMuted||d.rfMute)?'<span class="inv">MUTE</span>':'';
+  if(d.disp===0) return line(f+'MHz',ant+lock)+line(esc(d.name),'')+line((d.pilot==='Active'?'P ':'')+m,batt());
+  if(d.disp===1) return line('B.Ch: '+d.bank+'.'+d.ch,ant+lock)+line(f+'MHz','')+line((d.pilot==='Active'?'P ':'')+m,batt());
+  return line(esc(d.name),ant+lock)+line('B.Ch: '+d.bank+'.'+d.ch,'')+line((d.pilot==='Active'?'P ':'')+m,batt());
+}
+function editLines(d){
+  const t=d.tmp, it=item(d);
+  if(t.k==='ro') return line('Software Revision','')+`<div class="ln r"><span>1.2.0</span></div>`;
+  if(t.k==='reset') return line('Reset','')+`<div class="ln c"><span class="inv">Reset?</span></div>`+line('SET confirma','');
+  if(t.k==='bank'||t.k==='chan'){
+    const title=t.easy?'Easy Setup':'Frequency Preset';
+    if(t.k==='bank'){
+      const fr=t.easy&&d.banks?d.banks[t.b]:null;
+      return line(title,'')+`<div class="ln"><span>Bank</span><span class="grow"></span><span class="inv">${t.b}</span></div>`+
+        (fr!=null?`<div class="ln r"><span>Free: ${fr}</span></div>`:'');
+    }
+    return line(title,'')+`<div class="ln"><span>B.Ch:</span><span class="grow"></span><span>${t.b}.</span><span class="inv">${t.c}</span></div>`+
+      `<div class="ln r"><span>${f3(freqOf(t.b,t.c))}MHz</span></div>`;
+  }
+  if(t.k==='uch') return line('Tune','')+`<div class="ln"><span>B.Ch:</span><span class="grow"></span><span>U.</span><span class="inv">${t.c}</span></div>`+
+    `<div class="ln r"><span>${f3(U[t.c-1])}MHz</span></div>`;
+  if(t.k==='ufreq') return line('Tune','')+`<div class="ln c"><span class="inv">${f3(U[t.c-1])}MHz</span></div>`+line('B.Ch: U.'+t.c,'');
+  if(t.k==='name'){
+    const s=t.s.map((c,i)=>i===t.p?`<span class="inv">${esc(c)}</span>`:esc(c)).join('');
+    return line('Name','')+`<div class="ln c" style="letter-spacing:.08em">${s}</div>`+line('','SET avança');
+  }
+  return line(it,'')+`<div class="ln c"><span class="inv">${esc(val(d,it))}</span></div>`;
+}
+function draw(id,d){
+  const el=document.getElementById(id);
+  el.className='lcd'+(!d.power?' off':(d.lit>20?' dim':''));
+  if(!d.power){el.innerHTML='';return;}
+  if(d.full){el.innerHTML=`<div class="lcdText"><div class="ln c big">${esc(d.full)}</div></div>`;return;}
+  if(d.scr==='sync'){el.innerHTML=`<div class="lcdText"><div class="ln c big">sync ▶</div></div>`;return;}
+  if(d.scr==='scan'){
+    const n=14,on=Math.round(d.scanP*n);let b='';
+    for(let i=0;i<n;i++)b+=`<span class="sg${i===on?' hi':''}"></span>`;
+    el.innerHTML=`<div class="lcdText">${line('Scan New List','')}
+      <div class="ln c"><span>${LO.toFixed(0)}&hellip;${HI.toFixed(0)} MHz</span></div>
+      <div class="ln c">${b}</div></div>`;return;
+  }
+  if(d.scr==='std'){el.innerHTML=bars(d)+`<div class="lcdText">${stdLines(d)}</div>`;return;}
+  if(d.scr==='menu'){
+    const m=cur(d),it=item(d),v=val(d,it);
+    el.innerHTML=`<div class="lcdText">${line(m.t,'')}
+      <div class="ln"><span class="inv">${esc(it)}</span></div>
+      ${v?`<div class="ln r"><span>${esc(v)}</span></div>`:''}</div>`;return;
+  }
+  if(d.scr==='edit'){el.innerHTML=`<div class="lcdText">${editLines(d)}</div>`;return;}
+}
+
+/* ===================== laço ===================== */
+function tick(now){
+  const dt=Math.min(.1,(now-lastT)/1000); lastT=now;
+  speech(dt); fading(dt); updAmb();
+  const tgt=afTarget();
+  afNow += (tgt-afNow)*Math.min(1,(tgt>afNow?22:7)*dt);
+  if(afNow>=afHold){afHold=afNow;afHoldT=0;} else {afHoldT+=dt; if(afHoldT>1.1) afHold=Math.max(afNow,afHold-60*dt);}
+  if(afNow>=100) clipT=2.5; else clipT=Math.max(0,clipT-dt);
+
+  for(const d of [rx,tx]){
+    if(!d.power) continue;
+    d.lit+=dt;
+    if(d.full){d.fullT-=dt*1000; if(d.fullT<=0){const f=d.fullThen;d.full=null;d.fullThen=null;if(f)f();}}
+    if(d.scr==='std'&&d.autoLock==='Active'&&!d.locked&&!d.full){d.lockT+=dt;if(d.lockT>10){d.locked=true;d.lockT=0;}}
+    else if(d.scr!=='std') d.lockT=0;
+  }
+  if(rx.scr==='scan'){
+    rx.scanP+=dt/4.5;
+    if(rx.scanP>=1){rx.banks=scanBanks();rx.scr='edit';rx.tmp={k:'bank',b:rx.bank,c:rx.ch,easy:true};}
+  }
+  draw('rx-lcd',rx); draw('tx-lcd',tx);
+  const L=link();
+  document.getElementById('rx-led1').className='dot'+(rx.power?' red':'');
+  document.getElementById('rx-led2').className='dot'+(L.lock?' grn':'');
+  document.getElementById('tx-led1').className='dot'+(tx.power?' red':'');
+  document.getElementById('tx-led2').className='dot'+(clipT>0?' ylw':'');
+  paint(L);
+  requestAnimationFrame(tick);
+}
+let flashT=0;
+function paint(L){
+  if(flashT>0){flashT-=0.016;return;}
+  const c=[];
+  c.push(L.lock?['Link de RF '+Math.round(L.rf)+' dBµV','on']
+    : L.bar>3?['RF na antena sem link: frequência suja','bad']
+    : ['Sem RF','bad']);
+  c.push(L.audio?['Áudio passando','on']:['Sem áudio: '+L.why,'bad']);
+  if(tx.power){
+    c.push(clipT>0?['Estourando no transmissor','bad']
+      :afHold<25?['Nível baixo demais','bad']:['Nível bom','on']);
+  }
+  document.getElementById('state').innerHTML=c.map(([t,k])=>`<span class="chip ${k}">${esc(t)}</span>`).join('');
+}
+function flash(m){document.getElementById('state').innerHTML=`<span class="chip bad">${esc(m)}</span>`;flashT=2.6;}
+
+/* ===================== controles ===================== */
+document.querySelectorAll('.btn[data-b]').forEach(el=>{
+  const d=D[el.dataset.d], key=el.dataset.b;
+  let holdT=null, repT=null, long=false, speed=0;
+  const stop=()=>{if(holdT){clearTimeout(holdT);holdT=null;} if(repT){clearInterval(repT);repT=null;} el.classList.remove('held');};
+  el.addEventListener('pointerdown',e=>{
+    e.preventDefault(); long=false; speed=0; el.classList.add('held');
+    if(key==='onoff'){ holdT=setTimeout(()=>{long=true;press(d,key,true);},800); return; }
+    press(d,key,false);
+    if(key==='up'||key==='down'){
+      holdT=setTimeout(()=>{
+        const run=()=>{ press(d,key,false); speed++;
+          if(speed===6||speed===16){ clearInterval(repT);
+            repT=setInterval(run, speed<16?110:55); } };
+        repT=setInterval(run,190);
+      },420);
+    }
+  });
+  el.addEventListener('pointerup',e=>{e.preventDefault();
+    if(key==='onoff'&&!long){stop();press(d,key,false);return;} stop();});
+  el.addEventListener('pointerleave',stop);
+  el.addEventListener('pointercancel',stop);
+  el.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();press(d,key,false);}});
+});
+document.getElementById('tx-mute').addEventListener('click',e=>{
+  tx.muteSw=!tx.muteSw; e.currentTarget.setAttribute('aria-pressed',String(tx.muteSw));
+  tx.rfMute = tx.muteSw && tx.muteMode==='RF On/Off'; tx.lit=0;
+});
+const vN=['silêncio','sussurro','fala baixa','fala normal','fala projetada','grito'];
+document.getElementById('voice').addEventListener('input',e=>{
+  voice=+e.target.value; document.getElementById('voice-v').textContent=vN[Math.min(5,Math.floor(voice/18))];
+});
+document.getElementById('dist').addEventListener('input',e=>{
+  dist=+e.target.value; document.getElementById('dist-v').textContent=dist+' m';
+});
+document.getElementById('irbtn').addEventListener('click',()=>{
+  if(rx.scr!=='sync'){flash('O receptor precisa estar na tela Sync. Menu › Sync › SET.');return;}
+  if(!tx.power){show(rx,'sync ✗',1300,()=>{rx.scr='std';});flash('O transmissor está desligado.');return;}
+  tx.bank=rx.bank;tx.ch=rx.ch;tx.name=rx.name;tx.pilot=rx.pilot;tx.lit=0;
+  show(rx,'sync ✓',1300,()=>{rx.scr='std';});
+});
+
+/* troca de banda */
+document.querySelectorAll('.bd').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.bd').forEach(o=>o.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  band=b.dataset.band; TBL=BANDS[band].t; LO=BANDS[band].lo; HI=BANDS[band].hi;
+  makeU();
+  for(const d of [rx,tx]){d.bank=1;d.ch=1;d.scr='std';d.path=[];d.tmp=null;d.full=null;d.lit=0;}
+  refreshScan();
+}));
+
+/* ===================== varredura de RF ===================== */
+function parseCSV(text){
+  const out=[];
+  for(const ln of text.split(/\r?\n/)){
+    if(!ln.trim()) continue;
+    const nums=ln.split(/[;,\t|]/).map(p=>parseFloat(p.trim().replace(/^"|"$/g,'').replace(',','.')))
+      .filter(n=>Number.isFinite(n));
+    if(nums.length<2) continue;
+    out.push(nums);
+  }
+  if(out.length<20) return null;
+  const fmax=Math.max(...out.map(r=>r[0]));
+  const div = fmax>1e8 ? 1e6 : fmax>1e4 ? 1e3 : 1;
+  const pts=out.map(r=>({f:r[0]/div,l:r[1]})).filter(p=>p.f>300&&p.f<1100&&Number.isFinite(p.l));
+  return pts.length>20 ? pts.sort((a,b)=>a.f-b.f) : null;
+}
+document.getElementById('csv').addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const p=parseCSV(String(r.result));
+    if(!p){document.getElementById('rf-src').textContent=
+      'Não achei duas colunas de números nesse arquivo. Precisa ser frequência e nível.';return;}
+    scanAll=p; scanName='Varredura de '+f.name.replace(/\.(csv|txt)$/i,''); refreshScan();
+  };
+  r.readAsText(f);
+});
+document.getElementById('csvclear').addEventListener('click',()=>{loadSP();refreshScan();});
+document.getElementById('thr').addEventListener('input',e=>{
+  thrPct=+e.target.value; cutFromPct(); rx.banks=null; updSrc(); drawSpec();
+});
+function drawSpec(){
+  const cv=document.getElementById('spec'), ctx=cv.getContext('2d');
+  const w=cv.width=cv.clientWidth*2, h=cv.height=236;
+  const css=getComputedStyle(document.body);
+  const ink=css.getPropertyValue('--muted').trim()||'#888';
+  const acc=css.getPropertyValue('--accent').trim()||'#b4531a';
+  const bad=css.getPropertyValue('--warn').trim()||'#b03021';
+  ctx.clearRect(0,0,w,h);
+  const x=f=>(f-LO)/(HI-LO)*w;
+  const top=38, bot=h-30;        /* o gráfico ocupa exatamente esta faixa vertical */
+
+  /* grade de 6 em 6 MHz: a largura de um canal de TV no Brasil */
+  const first=Math.ceil((LO-470)/6)*6+470;
+  ctx.textAlign='center';
+  for(let f=first;f<=HI+0.001;f+=6){
+    const X=x(f);
+    ctx.strokeStyle=ink+'40';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(X,top-6);ctx.lineTo(X,bot+5);ctx.stroke();
+    ctx.fillStyle=ink;ctx.font='19px monospace';
+    ctx.fillText(f.toFixed(0),Math.min(w-26,Math.max(26,X)),h-8);
+  }
+  ctx.font='16px monospace';ctx.fillStyle=ink+'aa';
+  for(let f=first;f+6<=HI+0.001;f+=6) ctx.fillText('ch '+(14+Math.round((f-470)/6)),x(f+3),22);
+  ctx.textAlign='left';
+
+  if(hasScan){
+    const y=l=>bot-(l-loL)/Math.max(1,hiL-loL)*(bot-top);
+    ctx.beginPath();
+    bp.forEach((p,i)=>{const X=x(p.f),Y=y(p.l); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+    ctx.lineTo(x(bp[bp.length-1].f),bot); ctx.lineTo(x(bp[0].f),bot); ctx.closePath();
+    ctx.fillStyle=acc+'33'; ctx.fill();
+    ctx.beginPath();
+    bp.forEach((p,i)=>{const X=x(p.f),Y=y(p.l); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+    ctx.strokeStyle=acc;ctx.lineWidth=2;ctx.stroke();
+    const yt=y(cutDb);
+    ctx.beginPath();ctx.moveTo(0,yt);ctx.lineTo(w,yt);
+    ctx.strokeStyle=bad;ctx.setLineDash([9,9]);ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=bad;ctx.font='19px monospace';
+    ctx.fillText(cutDb.toFixed(1)+' dBm',8,yt-bot<-14?yt+20:yt-9);
+  } else {
+    ctx.fillStyle=bad+'44';
+    for(const [a,b] of simBusy()) ctx.fillRect(x(a),top,x(b)-x(a),bot-top);
+    ctx.fillStyle=ink;ctx.font='20px monospace';
+    ctx.fillText('faixas simuladas',10,top+22);
+  }
+  /* canais do banco atual, embaixo, e a frequência sintonizada atravessando */
+  ctx.fillStyle=ink;
+  if(TBL[rx.bank]) for(const f of TBL[rx.bank]) ctx.fillRect(x(f)-1,bot+2,2,7);
+  const fu=freqOf(rx.bank,rx.ch);
+  ctx.fillStyle=acc;ctx.fillRect(x(fu)-2,top-8,4,bot-top+16);
+}
+window.addEventListener('resize',drawSpec);
+
+/* ===================== exercícios ===================== */
+const EX=[
+ {t:'Ler o visor',d:'Deixe o receptor na tela que mostra banco e canal em vez da frequência.',
+  c:()=>rx.power&&rx.scr==='std'&&rx.disp===1,
+  ok:'É essa tela que você confere no set para ver se os dois estão no mesmo canal.'},
+ {t:'Achar um canal limpo',d:'Desligue o transmissor, rode o Scan New List e fique no banco com mais canais livres. Depois ligue o transmissor de novo.',
+  c:()=>{if(!rx.banks||rx.scr!=='std')return false;
+    const v=Object.values(rx.banks); return rx.banks[rx.bank]===Math.max(...v);},
+  ok:'Com o transmissor ligado, a frequência dele apareceria como ocupada e o scan mentiria para você. Por isso o manual manda desligar antes de varrer.'},
+ {t:'Sincronizar',d:'Mande o canal do receptor para o bodypack pelo infravermelho e confirme que o áudio passou a chegar.',
+  c:()=>link().audio&&rx.bank===tx.bank&&rx.ch===tx.ch,
+  ok:'Sync é mais rápido e mais seguro do que digitar o canal nos dois.'},
+ {t:'Ajustar o ganho',d:'Com a voz em "fala projetada", ajuste a Sensitivity até os picos chegarem perto do topo sem acender o AF PEAK.',
+  c:()=>voice>=72&&afHold>72&&afHold<100&&clipT===0&&link().audio,
+  ok:'Alto o suficiente para ficar acima do ruído, baixo o suficiente para não distorcer. É o ajuste que mais aparece no set.'},
+ {t:'Achar o limite',d:'Com tudo funcionando, afaste o personagem até o áudio começar a falhar. Veja em quantos metros isso acontece com o squelch em Low e em High.',
+  c:()=>dist>=25,
+  ok:'Quanto mais alto o squelch, mais cedo ele corta. Em troca, segura menos chiado quando o sinal some.'},
+ {t:'Diagnosticar',d:'Tem RF mas não tem áudio. Olhe o squelch, o pilot tone dos dois e a chave MUTE, e faça o som voltar.',
+  c:()=>link().audio,
+  ok:'No set você vai passar por isso: barra de RF cheia não quer dizer que o áudio está chegando.'}
+];
+const exEl=document.getElementById('exercises');
+exEl.innerHTML=EX.map((e,i)=>`<div class="ex"><h4><span class="mark" id="m${i}">${i+1}</span>${esc(e.t)}</h4>
+  <p>${esc(e.d)}</p><button class="btn2" data-ex="${i}">Conferir</button><div class="fb" id="f${i}"></div></div>`).join('');
+exEl.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-ex]'); if(!b) return;
+  const i=+b.dataset.ex,e=EX[i],f=document.getElementById('f'+i),m=document.getElementById('m'+i);
+  if(e.c()){f.className='fb ok';f.textContent=e.ok;m.className='mark done';m.textContent='✓';}
+  else {f.className='fb no';f.textContent='Ainda não. Confira o aparelho e tente de novo.';}
+});
+
+loadSP(); refreshScan();
+requestAnimationFrame(tick);
+</script>
+
+</body></html>
