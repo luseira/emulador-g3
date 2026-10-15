@@ -131,8 +131,10 @@ h1{font-size:clamp(1.5rem,4vw,2rem);margin:0 0 6px;letter-spacing:-.01em;text-wr
 .sw[aria-pressed="true"]::after{transform:translateX(21px)}
 .hint{font-size:.72rem;color:var(--muted);margin:10px 0 0;font-family:var(--fm)}
 
-.statusrow{margin-top:12px;display:flex;justify-content:center}
-.state{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+/* altura reservada: o bloco não muda de tamanho quando a mensagem troca */
+.devstat{display:grid;gap:5px;margin-top:11px;align-content:start;justify-items:start}
+#rx-stat{min-height:56px}
+#tx-stat{min-height:25px}
 .chip{font-family:var(--fm);font-size:.7rem;padding:3px 9px;border-radius:999px;
   border:1px solid var(--line);color:var(--muted)}
 .chip.on{border-color:var(--ok);color:var(--ok)}
@@ -211,6 +213,7 @@ table.ref td:first-child{color:var(--fg);padding-right:12px;white-space:nowrap}
           <span>CHAVE MUTE</span>
         </div>
       </div>
+      <div class="devstat" id="tx-stat"></div>
       <p class="hint">Segure ▲ ou ▼ para correr os valores depressa.</p>
     </div>
 
@@ -239,11 +242,11 @@ table.ref td:first-child{color:var(--fg);padding-right:12px;white-space:nowrap}
           <button class="btn" data-d="rx" data-b="set">SET</button>
         </div>
       </div>
+      <div class="devstat" id="rx-stat"></div>
       <p class="hint">ON/OFF curto troca a tela, longo desliga. No menu ele é o ESC.</p>
     </div>
   </div>
 
-  <div class="statusrow"><div class="state" id="state"></div></div>
 
   <div class="cols">
     <div class="card">
@@ -828,21 +831,32 @@ function tick(now){
   paint(L);
   requestAnimationFrame(tick);
 }
-let flashT=0;
-function paint(L){
-  if(flashT>0){flashT-=0.016;return;}
-  const c=[];
-  c.push(L.lock?['Link de RF '+Math.round(L.rf)+' dBµV','on']
-    : L.bar>3?['RF na antena sem link: frequência suja','bad']
-    : ['Sem RF','bad']);
-  c.push(L.audio?['Áudio passando','on']:['Sem áudio: '+L.why,'bad']);
-  if(tx.power){
-    c.push(clipT>0?['Estourando no transmissor','bad']
-      :afHold<25?['Nível baixo demais','bad']:['Nível bom','on']);
-  }
-  document.getElementById('state').innerHTML=c.map(([t,k])=>`<span class="chip ${k}">${esc(t)}</span>`).join('');
+let flashT=0, flashMsg='';
+function put(id,list){
+  const el=document.getElementById(id); if(!el) return;
+  const h=list.map(([t,k])=>`<span class="chip ${k}">${esc(t)}</span>`).join('');
+  if(el.dataset.h!==h){el.dataset.h=h; el.innerHTML=h;}   /* só redesenha quando muda */
 }
-function flash(m){document.getElementById('state').innerHTML=`<span class="chip bad">${esc(m)}</span>`;flashT=2.6;}
+function paint(L){
+  /* o que é do receptor fica embaixo do receptor; o nível de áudio, embaixo do transmissor */
+  const r=[], t=[];
+  if(!rx.power) r.push(['Receptor desligado','']);
+  else if(L.lock) r.push(['Link de RF — '+Math.round(L.rf)+' dBµV','on']);
+  else if(L.why==='frequências diferentes') r.push(['Não sincronizados: frequências diferentes','bad']);
+  else r.push(['Sem link: '+L.why,'bad']);
+  if(rx.power&&!L.lock&&L.bar>3) r.push(['Frequência suja: procure outra com o scan','bad']);
+
+  if(!tx.power) t.push(['Transmissor desligado','']);
+  else if(tx.rfMute) t.push(['RF desativado na chave MUTE','bad']);
+  else if(tx.afMuted) t.push(['Áudio cortado na chave MUTE','bad']);
+  else if(clipT>0) t.push(['Estourando: baixe a sensibilidade','bad']);
+  else if(afHold<25) t.push(['Nível baixo: suba a sensibilidade','bad']);
+  else t.push(['Nível de áudio bom','on']);
+
+  if(flashT>0){flashT-=0.016; r.length=0; r.push([flashMsg,'bad']);}
+  put('rx-stat',r); put('tx-stat',t);
+}
+function flash(m){flashMsg=m;flashT=2.6;}
 
 /* ===================== controles ===================== */
 document.querySelectorAll('.btn[data-b]').forEach(el=>{
