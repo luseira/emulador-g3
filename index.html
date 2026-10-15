@@ -103,6 +103,9 @@ h1{font-size:clamp(1.5rem,4vw,2rem);margin:0 0 6px;letter-spacing:-.01em;text-wr
 .sq{position:absolute;left:-3px;width:17px;height:2px;background:var(--lcd-ink)}
 .mtr span{font-size:.58rem;opacity:.75}
 .ant{font-size:.6rem;height:.9em;opacity:.8}
+/* antena transmitindo: mastro e duas ondas, em SVG para escalar com a fonte do visor */
+.ant-i{display:inline-block;width:.95em;height:.95em;vertical-align:-.13em;margin-left:.2em;
+  fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
 .lk{display:inline-block;width:9px;height:7px;background:currentColor;position:relative;
   border-radius:1px;vertical-align:middle;margin-left:3px}
 .lk::before{content:"";position:absolute;left:1.5px;top:-4px;width:4px;height:4px;
@@ -739,6 +742,11 @@ function scanBanks(){
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const line=(l,r,c)=>`<div class="ln ${c||''}">${l!==''?`<span>${l}</span>`:''}<span class="grow"></span>${r?`<span>${r}</span>`:''}</div>`;
 const batt=()=>'<span class="bt"><i></i><i></i><i></i></span>';
+const ANT='<svg class="ant-i" viewBox="0 0 12 12" aria-hidden="true">'
+  +'<path d="M6 11.5V4.2"/>'                      /* mastro */
+  +'<path d="M3.9 6.4a2.9 2.9 0 0 1 4.2 0"/>'     /* onda de dentro */
+  +'<path d="M1.9 5a5.2 5.2 0 0 1 8.2 0"/>'       /* onda de fora */
+  +'</svg>';
 function segs(n,on,hold){let h='';for(let i=0;i<n;i++){
   const cls=i<on?'on':(hold!=null&&i===hold?'hold':'');h+=`<div class="seg ${cls}"></div>`;}return h;}
 function bars(d){
@@ -765,7 +773,7 @@ function stdLines(d){
     return line('B.Ch: '+d.bank+'.'+d.ch,lock)+line(esc(d.name),'')+
       line((d.pilot==='Active'?'P ':'')+((d.afOut>0?'+':'')+d.afOut),batt());
   }
-  const ant=(!d.rfMute)?'↑':'', m=(d.afMuted||d.rfMute)?'<span class="inv">MUTE</span>':'';
+  const ant=(!d.rfMute)?ANT:'', m=(d.afMuted||d.rfMute)?'<span class="inv">MUTE</span>':'';
   if(d.disp===0) return line(f+'MHz',ant+lock)+line(esc(d.name),'')+line((d.pilot==='Active'?'P ':'')+m,batt());
   if(d.disp===1) return line('B.Ch: '+d.bank+'.'+d.ch,ant+lock)+line(f+'MHz','')+line((d.pilot==='Active'?'P ':'')+m,batt());
   return line(esc(d.name),ant+lock)+line('B.Ch: '+d.bank+'.'+d.ch,'')+line((d.pilot==='Active'?'P ':'')+m,batt());
